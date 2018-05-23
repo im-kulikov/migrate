@@ -41,7 +41,7 @@ jobs:
           name: Check code
           # https://github.com/alecthomas/gometalinter/issues/149#issuecomment-311433359
           command: |
-            CGO_ENABLED=0 gometalinter ./... --fast -s vendor --deadline=60s
+            CGO_ENABLED=0 gometalinter ./... --fast -s vendor --deadline=60s --cyclo-over 20
             if [ "$?" != "0" ]; then
                 echo "Fix it"
                 exit 1
