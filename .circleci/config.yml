@@ -1,0 +1,51 @@
+version: 2
+dependencies:
+  cache_directories:
+    - "~/docker-images"
+jobs:
+  build:
+    working_directory: /go/src/github.com/im-kulikov/migrate
+    docker:
+      # CircleCI Go images available at: https://hub.docker.com/r/circleci/golang/
+      - image: circleci/golang:1
+      # CircleCI PostgreSQL images available at: https://hub.docker.com/r/circleci/postgres/
+      - image: circleci/postgres:alpine-ram
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: "12345"
+          POSTGRES_DB: migrator
+      - image: redis:alpine
+    working_directory: /go/src/github.com/cryptopay-dev/midas
+    environment:
+      TEST_REDIS_ADDR: 127.0.0.1:6379
+      TEST_DATABASE_ADDR: localhost:5432
+      TEST_DATABASE_USER: postgres
+      TEST_DATABASE_DATABASE: migrator
+      TEST_DATABASE_PASSWORD: 123456
+    steps:
+      - checkout
+      - run:
+          name: Wait for db
+          command: dockerize -wait tcp://${TEST_DATABASE_ADDR} -timeout 1m
+      - run:
+          name: Dep
+          command: |
+              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+              dep ensure
+      - run:
+          name: Get go-metalinter
+          command: |
+            go get -u github.com/alecthomas/gometalinter
+            gometalinter --install
+      - run:
+          name: Check code
+          # https://github.com/alecthomas/gometalinter/issues/149#issuecomment-311433359
+          command: |
+            CGO_ENABLED=0 gometalinter ./... --fast -s vendor --deadline=60s
+            if [ "$?" != "0" ]; then
+                echo "Fix it"
+                exit 1
+            fi
+      - run:
+          name: Start test environment and run tests
+          command: go test -v -race ./...
